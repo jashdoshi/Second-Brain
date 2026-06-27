@@ -4,6 +4,14 @@ A company document intelligence tool. Ingest PDFs, DOCX files, and Markdown note
 
 ---
 
+## Screenshots
+
+| Graph view | Chat / Query | Upload document |
+|:---:|:---:|:---:|
+| ![Graph view](docs/screenshots/graph-view.png) | ![Chat panel](docs/screenshots/chat-panel.png) | ![Add note](docs/screenshots/add-note.png) |
+
+---
+
 ## What it does
 
 1. **Ingest** — upload a document; GPT-4o-mini extracts entities and relationships from the text.
