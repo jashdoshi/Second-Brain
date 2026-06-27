@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+openai
+neo4j
+python-dotenv
+certifi
+pypdf
+python-docx
+sentence-transformers
+python-multipart
+mcp
