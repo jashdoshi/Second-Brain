@@ -29,34 +29,36 @@ Example:
 ```
 1. User asks: "How does RAG connect to embeddings?"
 
-2. Embed the question
-   question_embedding = openai.embed("How does RAG connect to embeddings?")
-   # → list of 1536 floats
+2. Embed the question (locally via HuggingFace)
+   question_embedding = embedder.embed("How does RAG connect to embeddings?")
+   # → list of 384 floats
 
 3. Vector search in Neo4j
-   seed_nodes = neo4j.vector_search(question_embedding, top_k=5)
-   # → ["RAG", "Vector Search", "Embeddings", "Similarity", "Retrieval"]
+   seed_results = graph.vector_search(question_embedding, top_k=5)
+   # → ["RAG", "Vector Search", "Embeddings", "Similarity", "Retrieval"] nodes
 
 4. Graph expansion (2-hop neighbors)
    for each seed_node:
-       neighbors = neo4j.get_neighbors(seed_node.id, depth=2)
+       neighbors = graph.get_neighbors(seed_node["id"], depth=2)
    # Adds connected concepts like "Neo4j", "Cosine Similarity", "GPT-4o-mini"
 
 5. Build context string
-   context = format_nodes_as_text(seed_nodes + all_neighbors)
+   context = _build_context(list(all_nodes.values()))
+   # Truncated at 6000 chars to stay within LLM token limits
 
 6. Call GPT-4o-mini
-   prompt = f"""
-   Answer this question using only the knowledge graph context below.
-   
-   Context: {context}
-   Question: {question}
-   """
-   answer = gpt4o_mini.complete(prompt)
+   answer = await _call_llm(question, context)
+   # System prompt: "Answer using ONLY the context provided below."
 
-7. Return answer + source node IDs
-   return {"answer": answer, "source_node_ids": [node.id for node in used_nodes]}
+7. Return answer + source node IDs and names
+   return RAGResponse(
+       answer=answer,
+       source_node_ids=seed_ids,
+       source_node_names=seed_names
+   )
 ```
+
+The code lives in `backend/services/rag.py`. The key function is `answer(question: str) -> RAGResponse`.
 
 ---
 
@@ -73,15 +75,15 @@ Example:
 
 ## The highlighting connection
 
-The `source_node_ids` returned in the `/query` response are what the frontend uses to light up the relevant nodes white in the 3D graph. The user can literally *see* which concepts were used to generate the answer.
+The `source_node_ids` returned in the `/query` response are what the frontend uses to highlight the relevant nodes in the 3D graph. The `ChatPanel` calls `onHighlight(source_node_ids)` after each query, and `App.jsx` passes the highlighted set to `GraphCanvas` to change node colors.
 
 ---
 
 ## Related concepts
-- [embeddings.md](embeddings.md) — how the vector search part works
+- [embeddings.md](embeddings.md) — how the vector search part works (HuggingFace, 384 dims)
 - [neo4j.md](neo4j.md) — how the graph traversal part works
 - [openai-apis.md](openai-apis.md) — the GPT-4o-mini call that generates the final answer
 
 ---
 
-*Last updated: 2026-06-27*
+*Last updated: 2026-06-28*

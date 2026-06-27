@@ -15,7 +15,7 @@ This folder is your personal reference library for everything you've built and l
 - [tech-stack.md](tech-stack.md) — Every technology used, explained simply
 - [neo4j.md](neo4j.md) — Graph database: nodes, edges, Cypher, vector indexes
 - [fastapi.md](fastapi.md) — Python web framework: routes, async, Pydantic
-- [openai-apis.md](openai-apis.md) — Embeddings and GPT-4o-mini: what they do and how we call them
+- [openai-apis.md](openai-apis.md) — GPT-4o-mini for entity extraction and Q&A (embeddings come from HuggingFace, not OpenAI)
 - [react-force-graph.md](react-force-graph.md) — 3D graph rendering in the browser
 
 ### Core Concepts (the ideas that power the project)

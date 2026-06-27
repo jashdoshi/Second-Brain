@@ -14,7 +14,13 @@ Think of MCP like a USB standard. Instead of every device needing a custom cable
 
 ---
 
-## What we expose via MCP
+## Current status
+
+**Phase 4 (MCP server) has not been built yet.** The `mcp` package is listed in `requirements.txt` and the plan is documented here, but `services/mcp.py` does not exist yet.
+
+---
+
+## What we plan to expose via MCP
 
 Three tools, each a function the AI can call:
 
@@ -24,39 +30,40 @@ Three tools, each a function the AI can call:
 | `get_neighbors(node_id)` | Returns all nodes connected to a given node (2 hops) | "What's related to this concept?" |
 | `find_path(concept_a, concept_b)` | Finds the shortest path between two concepts | "How does X connect to Y?" |
 
+All three operations already exist as functions in `services/graph.py` — the MCP layer just exposes them as callable tools.
+
 ---
 
-## How MCP works in this project
+## How MCP will work in this project
 
-The MCP server is not a separate service — it's mounted directly onto the FastAPI app. This is a deliberate architectural decision: one deployed service instead of two.
+The MCP server will not be a separate service — it will be mounted directly onto the FastAPI app. This is a deliberate architectural decision: one deployed service instead of two.
 
 ```python
-# services/mcp.py
+# services/mcp.py (planned — not yet implemented)
 from mcp.server import Server
-from mcp.server.fastapi import create_mcp_router
 
 mcp_server = Server("second-brain")
 
 @mcp_server.tool()
 async def search_nodes(query: str) -> list[dict]:
     """Find nodes semantically similar to the query."""
-    embedding = await embed(query)
-    return await graph.vector_search(embedding, top_k=5)
+    embedding = embedder.embed(query)
+    return graph.vector_search(embedding, top_k=5)
 
 @mcp_server.tool()
 async def get_neighbors(node_id: str) -> list[dict]:
     """Get all nodes connected to the given node within 2 hops."""
-    return await graph.get_neighbors(node_id, depth=2)
+    return graph.get_neighbors(node_id, depth=2)
 
 @mcp_server.tool()
 async def find_path(concept_a: str, concept_b: str) -> list[dict]:
     """Find the shortest path between two concepts in the graph."""
-    return await graph.find_path(concept_a, concept_b)
+    return graph.find_path(concept_a, concept_b)
 ```
 
 ---
 
-## How to use it from Claude Desktop
+## How to use it from Claude Desktop (once built)
 
 Once the backend is deployed and the MCP endpoint is configured in Claude Desktop settings, Claude can call these tools mid-conversation.
 
@@ -87,8 +94,8 @@ Claude: "Your graph has 5 concepts related to RAG: ..."
 | Discovery | AI reads tool descriptions | Developer reads API docs |
 | Use case | AI-driven workflows | Human-driven UI |
 
-We have both — the REST API powers the web frontend, the MCP server powers Claude Desktop integration.
+We have both planned — the REST API powers the web frontend, the MCP server will power Claude Desktop integration.
 
 ---
 
-*Last updated: 2026-06-27*
+*Last updated: 2026-06-28*

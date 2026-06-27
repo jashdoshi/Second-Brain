@@ -22,7 +22,7 @@ If your backend were a restaurant, FastAPI is the host — it greets every reque
 | Speed | Very fast | Slower | Slowest |
 | Learning curve | Low-medium | Low | High |
 
-For an AI backend that makes async calls to OpenAI and Neo4j, FastAPI is the right tool.
+For an AI backend that makes async calls to OpenAI, FastAPI is the right tool.
 
 ---
 
@@ -31,35 +31,44 @@ For an AI backend that makes async calls to OpenAI and Neo4j, FastAPI is the rig
 ```python
 # main.py — the entry point
 from fastapi import FastAPI
-from routers import ingest, query
+from routers import graph_router, ingest, query
 
-app = FastAPI()
+app = FastAPI(title="Second Brain API", lifespan=lifespan)
 app.include_router(ingest.router)
 app.include_router(query.router)
+app.include_router(graph_router.router)
 ```
 
 ```python
-# routers/ingest.py — one endpoint
-from fastapi import APIRouter
+# routers/ingest.py — file upload endpoint
+from fastapi import APIRouter, Form, UploadFile
 from pydantic import BaseModel
 
 router = APIRouter()
 
-class IngestRequest(BaseModel):
-    text: str
-    source: str | None = None
-    type: str = "concept"
-    topic: str
+class IngestPreviewResponse(BaseModel):
+    document_id: str
+    filename: str
+    node_count: int
+    edge_count: int
+    nodes: list[dict]
+    edges: list[dict]
+    committed: bool
 
-@router.post("/ingest")
-async def ingest_text(request: IngestRequest):
+@router.post("/ingest", response_model=IngestPreviewResponse)
+async def ingest_document(
+    file: UploadFile,
+    source: str = Form(default=""),
+    commit: bool = Form(default=False),
+) -> IngestPreviewResponse:
     # FastAPI automatically:
-    # - parses the JSON body
-    # - validates it against IngestRequest
+    # - parses the multipart/form-data body
+    # - validates the UploadFile and form fields
     # - returns a 422 if anything is wrong
-    result = await some_service(request)
-    return result
+    ...
 ```
+
+Note: `/ingest` takes a **file upload** (`multipart/form-data`), not a JSON body. The `commit` flag controls whether the result is written to Neo4j or just previewed.
 
 ---
 
@@ -72,25 +81,21 @@ Navigate to `http://localhost:8000/docs` while the server is running. FastAPI ge
 Define a `BaseModel` class, decorate your route with it, and FastAPI validates every request automatically. Missing fields, wrong types — all caught before your code even runs.
 
 ### Async by default
-All route handlers use `async def`. This means FastAPI can handle many requests simultaneously while waiting for OpenAI or Neo4j to respond, instead of blocking on each call.
+All route handlers use `async def`. This means FastAPI can handle many requests simultaneously while waiting for OpenAI to respond, instead of blocking on each call.
 
-### Dependency injection
-FastAPI has a `Depends()` system for sharing things like database connections across routes:
+### Lifespan events
+The app uses a `lifespan` context manager to run startup code (ensuring the Neo4j vector index exists) before accepting any traffic:
 
 ```python
-from fastapi import Depends
+from contextlib import asynccontextmanager
 
-async def get_db():
-    driver = get_neo4j_driver()
-    try:
-        yield driver
-    finally:
-        await driver.close()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    graph.ensure_vector_index()  # runs on startup
+    yield
+    # cleanup would go here
 
-@router.get("/nodes")
-async def get_nodes(driver = Depends(get_db)):
-    # driver is automatically provided and cleaned up
-    ...
+app = FastAPI(lifespan=lifespan)
 ```
 
 ---
@@ -107,13 +112,14 @@ uvicorn main:app --reload
 
 ---
 
-## The two routers in this project
+## The three routers in this project
 
-| Router | File | Endpoint | Job |
+| Router | File | Endpoint(s) | Job |
 |---|---|---|---|
-| Ingest | `routers/ingest.py` | `POST /ingest` | Takes text, extracts entities, writes to Neo4j |
-| Query | `routers/query.py` | `POST /query` | Takes a question, runs Graph-RAG, returns answer |
+| Ingest | `routers/ingest.py` | `POST /ingest` | Upload file, extract entities, optionally write to Neo4j |
+| Query | `routers/query.py` | `POST /query` | Ask a question, run Graph-RAG, return grounded answer |
+| Graph | `routers/graph_router.py` | `GET /graph`, `DELETE /graph` | Fetch all nodes+edges for the frontend; clear the graph |
 
 ---
 
-*Last updated: 2026-06-27*
+*Last updated: 2026-06-28*

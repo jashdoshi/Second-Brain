@@ -12,9 +12,9 @@ Computers don't understand words. They understand numbers. So how do you make a 
 
 An embedding is a list of numbers (a vector) that represents the *meaning* of a piece of text.
 
-In this project, every node gets a 1536-number embedding:
+In this project, every node gets a **384-number embedding**:
 ```
-"RAG" → [0.02, -0.14, 0.87, 0.03, ..., -0.22]   # 1536 numbers
+"RAG" → [0.02, -0.14, 0.87, 0.03, ..., -0.22]   # 384 numbers
 "Retrieval Augmented Generation" → [0.021, -0.139, 0.869, ...]   # very similar!
 "Pizza" → [-0.45, 0.92, -0.11, ...]   # very different
 ```
@@ -25,26 +25,32 @@ The key insight: **similar meanings produce similar numbers**. The distance betw
 
 ## How we generate embeddings
 
-We use OpenAI's `text-embedding-3-small` model:
+We use the **HuggingFace `sentence-transformers/all-MiniLM-L6-v2` model**, which runs locally:
 
 ```python
-response = await openai_client.embeddings.create(
-    model="text-embedding-3-small",
-    input="Retrieval Augmented Generation uses vector search"
-)
-embedding = response.data[0].embedding  # list of 1536 floats
+from sentence_transformers import SentenceTransformer
+
+_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+def embed(text: str) -> list[float]:
+    vector = _model.encode(text[:1500], convert_to_numpy=True)
+    return vector.tolist()  # 384 floats
 ```
 
-- **Model:** `text-embedding-3-small` — fast, cheap, 1536 dimensions
-- **Dimensions:** 1536 — each embedding is a list of 1536 floats
-- **This is a one-way operation** — you can't reverse an embedding back to text
+Key facts:
+- **Model:** `all-MiniLM-L6-v2` — fast, lightweight, runs entirely on your machine
+- **Dimensions:** 384 — each embedding is a list of 384 floats
+- **No API cost** — embeddings are generated locally, not sent to OpenAI
+- **One-way operation** — you can't reverse an embedding back to text
+- The model is loaded once at startup and reused (singleton pattern in `embedder.py`)
+- Text is truncated to ~1500 characters before embedding — this model has a 256-token limit
 
 ---
 
 ## How we use embeddings for search
 
 When you ask a question, we:
-1. Embed the question (same model, same dimensions)
+1. Embed the question (same model, same 384 dimensions)
 2. Ask Neo4j: "find the nodes whose embeddings are closest to this"
 3. "Closest" = smallest angle between vectors (cosine similarity)
 
@@ -52,7 +58,7 @@ This is called **semantic search** — it finds conceptually similar content eve
 
 ```
 Question: "How does AI find relevant documents?"
-           ↓ embed
+           ↓ embed (384 floats)
 [0.03, -0.12, 0.88, ...]
            ↓ cosine similarity against all stored embeddings
 Returns: "RAG", "Vector Search", "Retrieval" nodes — even though none of those
@@ -75,7 +81,7 @@ Why angle instead of raw distance? Because we care about *direction* (meaning), 
 
 ## The embedding is stored in Neo4j
 
-Every node in our graph has an `embedding` property — the 1536-float list. This is what the vector index is built on. See [neo4j.md](neo4j.md) for how the vector index works.
+Every node in our graph has an `embedding` property — the 384-float list. This is what the vector index is built on. The index is configured for exactly 384 dimensions. See [neo4j.md](neo4j.md) for how the vector index works.
 
 ---
 
@@ -90,4 +96,4 @@ Keyword search only finds exact word matches. Embeddings find *meaning* matches.
 
 ---
 
-*Last updated: 2026-06-27*
+*Last updated: 2026-06-28*
